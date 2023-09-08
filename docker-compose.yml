@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: mysql_instance
+    environment:
+      UPLOAD_LIMIT: ${UPLOAD_LIMIT}
+      MYSQL_ROOT_HOST: ${MYSQL_ROOT_HOST}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    volumes:
+      - ./initdb.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${MYSQL_SERVER_PORT}:${MYSQL_SERVER_PORT}"
+    command: --default-authentication-plugin=mysql_native_password --init-file /docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s      
+    restart: on-failure      
+
+  app:
+    image: node:16-alpine
+    container_name: nodeapp
+    volumes:
+      - .:/usr/src/app
+    working_dir: /usr/src/app
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_USER: 'root'
+      MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_SERVER_PORT: ${MYSQL_SERVER_PORT}
+      WEBAPP_SERVER_PORT: ${WEBAPP_SERVER_PORT}
+    command: sh -c 'npm install && npm start'
+    ports:
+      - "${WEBAPP_SERVER_PORT}:${WEBAPP_SERVER_PORT}"
+    depends_on:
+      mysql:
+        condition: service_healthy    
+    restart: on-failure
